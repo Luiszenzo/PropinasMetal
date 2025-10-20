@@ -33,7 +33,8 @@ async function displayTickets() {
         
         snapshot.forEach(doc => {
             const ticket = doc.data();
-            const ticketDate = ticket.fecha;
+            // Ensure date is properly formatted (YYYY-MM-DD)
+            const ticketDate = ticket.fecha.split('T')[0]; 
             
             // Add date header if it's a new day
             if (ticketDate !== currentDate) {
@@ -91,10 +92,22 @@ async function displayTickets() {
 }
 
 // Add this helper function
+// Update this helper function to handle timezone correctly
 function formatDate(dateString) {
-    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-    const date = new Date(dateString);
-    return date.toLocaleDateString('es-ES', options);
+    // Parse the date string in local timezone
+    const [year, month, day] = dateString.split('-');
+    const date = new Date(year, month - 1, day);
+    
+    const options = { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+    };
+    
+    // Format to Spanish and capitalize first letter
+    let formattedDate = date.toLocaleDateString('es-ES', options);
+    return formattedDate.charAt(0).toUpperCase() + formattedDate.slice(1);
 }
 
 // Función para mostrar el resumen de propinas
@@ -303,7 +316,10 @@ function setupLogin() {
 async function handleSubmit(e) {
     e.preventDefault();
     try {
-        const fecha = document.getElementById('fecha').value;
+        const fechaInput = document.getElementById('fecha').value;
+        // Ensure we store the date in YYYY-MM-DD format
+        const fecha = new Date(fechaInput).toISOString().split('T')[0];
+        
         const monto = parseFloat(document.getElementById('monto').value);
 
         if (!fecha || isNaN(monto) || monto <= 0 || selectedEmpleados.length === 0) {
