@@ -30,19 +30,35 @@ async function displayTickets() {
 
         const resumenPropinas = {};
         let currentDate = null;
+        let dateGroupElement = null;
         
         snapshot.forEach(doc => {
             const ticket = doc.data();
-            // Ensure date is properly formatted (YYYY-MM-DD)
-            const ticketDate = ticket.fecha.split('T')[0]; 
+            const ticketDate = ticket.fecha.split('T')[0];
             
-            // Add date header if it's a new day
             if (ticketDate !== currentDate) {
                 currentDate = ticketDate;
+                
+                // Create date group container
+                dateGroupElement = document.createElement('div');
+                dateGroupElement.className = 'date-group';
+                ticketsList.appendChild(dateGroupElement);
+                
+                // Create clickable date header
                 const dateHeader = document.createElement('div');
-                dateHeader.className = 'date-header';
+                dateHeader.className = 'date-header collapsed';
                 dateHeader.innerHTML = `<h3>${formatDate(ticketDate)}</h3>`;
-                ticketsList.appendChild(dateHeader);
+                dateHeader.addEventListener('click', function() {
+                    const ticketsGroup = this.nextElementSibling;
+                    this.classList.toggle('collapsed');
+                    ticketsGroup.classList.toggle('visible');
+                });
+                dateGroupElement.appendChild(dateHeader);
+                
+                // Create tickets container for this date
+                const ticketsGroup = document.createElement('div');
+                ticketsGroup.className = 'tickets-group';
+                dateGroupElement.appendChild(ticketsGroup);
             }
 
             const ticketElement = document.createElement('div');
@@ -66,12 +82,14 @@ async function displayTickets() {
                     <button class="btn-delete" data-id="${doc.id}">Eliminar</button>
                 </div>
             `;
-            ticketsList.appendChild(ticketElement);
-
+            
+            // Add ticket to the current date's tickets group (CHANGED THIS LINE)
+            dateGroupElement.querySelector('.tickets-group').appendChild(ticketElement);
+            
             // Add event listener for the delete button
             const deleteBtn = ticketElement.querySelector('.btn-delete');
             deleteBtn.addEventListener('click', deleteTicket);
-
+            
             // Calcular propinas por empleado
             if (ticket.empleados && ticket.empleados.length > 0 && ticket.monto) {
                 const propinaPorEmpleado = ticket.monto / ticket.empleados.length;
@@ -648,23 +666,29 @@ async function generateReport(type) {
                         alert('Por favor seleccione una semana');
                         return;
                     }
-                    const [year, week] = weekValue.split('-W');
-                    const date = new Date(year, 0, 1);
-                    const dayMs = 24 * 60 * 60 * 1000;
-                    const weekMs = 7 * dayMs;
                     
-                    // Ajustar al primer día de la semana (lunes)
+                    // Parse year and week number correctly
+                    const [year, weekStr] = weekValue.split('-W');
+                    const week = parseInt(weekStr);
+                    
+                    // Create date for January 1st of the selected year
+                    const date = new Date(year, 0, 1);
+                    
+                    // Adjust to the first day of the week (Monday)
                     while (date.getDay() !== 1) {
-                        date.setTime(date.getTime() + dayMs);
+                        date.setDate(date.getDate() + 1);
                     }
                     
-                    // Avanzar a la semana seleccionada
-                    date.setTime(date.getTime() + (week - 1) * weekMs);
-                    startDate = new Date(date).toISOString().split('T')[0];
+                    // Move to the selected week and subtract 1 week
+                    date.setDate(date.getDate() + (week - 2) * 7); // Restamos 2 para obtener la semana anterior
+                    startDate = date.toISOString().split('T')[0];
                     
-                    date.setTime(date.getTime() + 6 * dayMs);
-                    endDate = new Date(date).toISOString().split('T')[0];
-                    title = `Reporte Semanal ${startDate} al ${endDate}`;
+                    // Calculate end date (6 days after start date)
+                    const endDateObj = new Date(date);
+                    endDateObj.setDate(date.getDate() + 6);
+                    endDate = endDateObj.toISOString().split('T')[0];
+                    
+                    title = `Reporte Semanal (Semana Anterior) ${startDate} al ${endDate}`;
                 } 
                 else if (type === 'monthly') {
                     const monthValue = document.getElementById('reportMonth').value;

@@ -448,12 +448,46 @@ h1 {
     background-color: #f0f0f0;
     border-radius: 4px;
     border-left: 4px solid #2196F3;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
 .date-header h3 {
     margin: 0;
     color: #333;
     font-size: 1.1em;
+}
+
+.date-header::after {
+    content: "▼";
+    font-size: 0.8em;
+    transition: transform 0.3s;
+}
+
+.date-header.collapsed::after {
+    content: "▶";
+}
+
+.date-group {
+    margin-bottom: 15px;
+}
+
+.tickets-group {
+    display: none;
+}
+
+.tickets-group.visible {
+    display: block;
+}
+
+.date-header.collapsed + .tickets-group {
+    display: none;
+}
+
+.date-header:not(.collapsed) + .tickets-group {
+    display: block;
 }
 .ticket-actions {
     margin-top: 10px;
