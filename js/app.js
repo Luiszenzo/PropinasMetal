@@ -15,6 +15,34 @@ async function initApp() {
     }
 }
 
+// Helper to get ISO week string (YYYY-Www)
+function getWeekString(dateStr) {
+    const date = new Date(dateStr);
+    date.setDate(date.getDate() + 4 - (date.getDay() || 7));
+    const yearStart = new Date(date.getFullYear(),0,1);
+    const weekNo = Math.ceil((((date - yearStart) / 86400000) + 1)/7);
+    return `${date.getFullYear()}-W${weekNo.toString().padStart(2, '0')}`;
+}
+
+// Helper to get week range (start and end date) from ISO week string
+function getWeekRange(isoWeekStr) {
+    const [year, week] = isoWeekStr.split('-W');
+    const simple = new Date(year, 0, 1 + (parseInt(week) - 1) * 7);
+    // ISO week starts on Monday
+    const dayOfWeek = simple.getDay();
+    const monday = new Date(simple);
+    if (dayOfWeek <= 4) {
+        monday.setDate(simple.getDate() - simple.getDay() + 1);
+    } else {
+        monday.setDate(simple.getDate() + 8 - simple.getDay());
+    }
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    // Format as DD/MM/YYYY
+    const format = d => d.toLocaleDateString('es-MX');
+    return `${format(monday)} - ${format(sunday)}`;
+}
+
 // Función para mostrar tickets
 async function displayTickets() {
     try {
@@ -28,7 +56,8 @@ async function displayTickets() {
             return;
         }
 
-        const resumenPropinas = {};
+        // Change resumenPropinas to be grouped by week and employee
+        const resumenPropinas = {}; // { week: { empleado: monto } }
         let currentDate = null;
         let dateGroupElement = null;
         
@@ -90,16 +119,18 @@ async function displayTickets() {
             const deleteBtn = ticketElement.querySelector('.btn-delete');
             deleteBtn.addEventListener('click', deleteTicket);
             
-            // Calcular propinas por empleado
+            // Calcular propinas por empleado agrupadas por semana
             if (ticket.empleados && ticket.empleados.length > 0 && ticket.monto) {
                 const propinaPorEmpleado = ticket.monto / ticket.empleados.length;
+                const weekStr = getWeekString(ticketDate);
+                if (!resumenPropinas[weekStr]) resumenPropinas[weekStr] = {};
                 ticket.empleados.forEach(empleado => {
-                    resumenPropinas[empleado] = (resumenPropinas[empleado] || 0) + propinaPorEmpleado;
+                    resumenPropinas[weekStr][empleado] = (resumenPropinas[weekStr][empleado] || 0) + propinaPorEmpleado;
                 });
             }
         });
 
-        // Mostrar resumen de propinas
+        // Mostrar resumen de propinas por semana
         mostrarResumenPropinas(resumenPropinas);
         
     } catch (error) {
@@ -131,8 +162,6 @@ function formatDate(dateString) {
 // Función para mostrar el resumen de propinas
 function mostrarResumenPropinas(resumen) {
     const appElement = document.getElementById('app');
-    
-    // Verificar si ya existe el contenedor de resumen
     let resumenContainer = document.querySelector('.resumen-container');
     if (!resumenContainer) {
         resumenContainer = document.createElement('div');
@@ -140,23 +169,37 @@ function mostrarResumenPropinas(resumen) {
         appElement.appendChild(resumenContainer);
     }
 
+    // Get all unique employees and weeks
+    const weeks = Object.keys(resumen).sort();
+    const empleadosSet = new Set();
+    weeks.forEach(week => {
+        Object.keys(resumen[week]).forEach(emp => empleadosSet.add(emp));
+    });
+    const empleados = Array.from(empleadosSet).sort();
+
+    // Build table header with week ranges
+    let thead = `<tr><th>Empleado</th>`;
+    weeks.forEach(week => {
+        thead += `<th>${getWeekRange(week)}</th>`;
+    });
+    thead += `</tr>`;
+
+    // Build table body
+    let tbody = '';
+    empleados.forEach(emp => {
+        tbody += `<tr><td>${emp}</td>`;
+        weeks.forEach(week => {
+            const monto = resumen[week][emp] || 0;
+            tbody += `<td>$${monto.toFixed(2)}</td>`;
+        });
+        tbody += `</tr>`;
+    });
+
     resumenContainer.innerHTML = `
-        <h3 class="resumen-title">Resumen de Propinas</h3>
+        <h3 class="resumen-title">Resumen de Propinas por Semana</h3>
         <table class="resumen-table">
-            <thead>
-                <tr>
-                    <th>Empleado</th>
-                    <th>Propina Acumulada</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${Object.entries(resumen).map(([empleado, monto]) => `
-                    <tr>
-                        <td>${empleado}</td>
-                        <td>$${monto.toFixed(2)}</td>
-                    </tr>
-                `).join('')}
-            </tbody>
+            <thead>${thead}</thead>
+            <tbody>${tbody}</tbody>
         </table>
     `;
 }
@@ -687,8 +730,13 @@ async function generateReport(type) {
                     const endDateObj = new Date(date);
                     endDateObj.setDate(date.getDate() + 6);
                     endDate = endDateObj.toISOString().split('T')[0];
-                    
-                    title = `Reporte Semanal (Semana Anterior) ${startDate} al ${endDate}`;
+
+                    // NEW: Title with week range
+                    const format = d => {
+                        const dateObj = new Date(d);
+                        return dateObj.toLocaleDateString('es-MX');
+                    };
+                    title = `Reporte Semanal: ${format(startDate)} - ${format(endDate)}`;
                 } 
                 else if (type === 'monthly') {
                     const monthValue = document.getElementById('reportMonth').value;
@@ -699,7 +747,10 @@ async function generateReport(type) {
                     const [year, month] = monthValue.split('-');
                     startDate = new Date(year, month - 1, 1).toISOString().split('T')[0];
                     endDate = new Date(year, month, 0).toISOString().split('T')[0];
-                    title = `Reporte Mensual ${new Date(year, month - 1).toLocaleString('default', { month: 'long' })} ${year}`;
+
+                    // NEW: Title with month and year in Spanish
+                    const monthName = new Date(year, month - 1).toLocaleString('es-MX', { month: 'long' });
+                    title = `Reporte Mensual: ${monthName.charAt(0).toUpperCase() + monthName.slice(1)} ${year}`;
                 }
 
                 modal.remove();
@@ -720,6 +771,10 @@ async function generateReport(type) {
                 const { jsPDF } = window.jspdf;
                 const doc = new jsPDF();
                 
+                // NEW: Set the report title for weekly/monthly
+                doc.setFontSize(18);
+                doc.text(title, 14, 20);
+
                 // Agrupar tickets por día o semana según el tipo de reporte
                 // Cambiar de const a let para groupedData
                 let groupedData = {};
