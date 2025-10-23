@@ -588,19 +588,17 @@ async function generateReport(type) {
                 </div>
             `;
         } else if (type === 'weekly') {
-            // Use date input instead of week input for compatibility
             dateInputs = `
                 <div class="report-date-selector">
-                    <label>Seleccione un día de la semana:</label>
-                    <input type="date" id="reportWeekDate">
+                    <label>Seleccione la semana:</label>
+                    <input type="week" id="reportWeek">
                 </div>
             `;
         } else if (type === 'monthly') {
-            // Use date input instead of month input for compatibility
             dateInputs = `
                 <div class="report-date-selector">
-                    <label>Seleccione un día del mes:</label>
-                    <input type="date" id="reportMonthDate">
+                    <label>Seleccione el mes:</label>
+                    <input type="month" id="reportMonth">
                 </div>
             `;
         }
