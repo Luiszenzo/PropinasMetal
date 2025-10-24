@@ -555,344 +555,6 @@ async function clearDateFilter() {
 }
 
 
-// Función para generar reportes
-async function generateReport(type) {
-    try {
-        // Crear modal para selección de fechas
-        const modal = document.createElement('div');
-        modal.style.position = 'fixed';
-        modal.style.zIndex = '1000';
-        modal.style.left = '0';
-        modal.style.top = '0';
-        modal.style.width = '100%';
-        modal.style.height = '100%';
-        modal.style.backgroundColor = 'rgba(0,0,0,0.4)';
-        modal.style.display = 'flex';
-        modal.style.justifyContent = 'center';
-        modal.style.alignItems = 'center';
-
-        const modalContent = document.createElement('div');
-        modalContent.style.backgroundColor = '#fefefe';
-        modalContent.style.padding = '20px';
-        modalContent.style.borderRadius = '8px';
-        modalContent.style.width = '80%';
-        modalContent.style.maxWidth = '500px';
-
-        let dateInputs = '';
-        
-        if (type === 'daily') {
-            dateInputs = `
-                <div class="report-date-selector">
-                    <label>Seleccione el día:</label>
-                    <input type="date" id="reportDate">
-                </div>
-            `;
-        } else if (type === 'weekly') {
-            dateInputs = `
-                <div class="report-date-selector">
-                    <label>Seleccione la semana:</label>
-                    <input type="week" id="reportWeek">
-                </div>
-            `;
-        } else if (type === 'monthly') {
-            dateInputs = `
-                <div class="report-date-selector">
-                    <label>Seleccione el mes:</label>
-                    <input type="month" id="reportMonth">
-                </div>
-            `;
-        }
-
-        modalContent.innerHTML = `
-            <h2>Generar Reporte ${type === 'daily' ? 'Diario' : type === 'weekly' ? 'Semanal' : 'Mensual'}</h2>
-            ${dateInputs}
-            <div style="display: flex; gap: 10px; margin-top: 20px;">
-                <button id="generateReportBtn" style="padding: 8px 15px; background-color: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">Generar</button>
-                <button id="cancelReportBtn" style="padding: 8px 15px; background-color: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer;">Cancelar</button>
-            </div>
-        `;
-
-        modal.appendChild(modalContent);
-        document.body.appendChild(modal);
-
-        // Esperar a que el usuario seleccione las fechas
-        return new Promise((resolve) => {
-            document.getElementById('generateReportBtn').addEventListener('click', async () => {
-                let startDate, endDate, title;
-
-                if (type === 'daily') {
-                    const dateValue = document.getElementById('reportDate').value;
-                    if (!dateValue) {
-                        alert('Por favor seleccione una fecha');
-                        return;
-                    }
-                    startDate = dateValue;
-                    endDate = dateValue;
-                    title = `Reporte Diario - ${startDate}`;
-                    
-                    // Obtener tickets del día
-                    const ticketsRef = db.collection('tickets');
-                    const snapshot = await ticketsRef
-                        .where('fecha', '==', startDate)
-                        .get();
-
-                    if (snapshot.empty) {
-                        alert(`No hay tickets para la fecha seleccionada (${startDate})`);
-                        return;
-                    }
-
-                    // Inicializar jsPDF
-                    const { jsPDF } = window.jspdf;
-                    const doc = new jsPDF();
-                    
-                    // Configurar título
-                    doc.setFontSize(18);
-                    doc.text(title, 14, 20);
-                    
-                    // Preparar datos para la tabla
-                    const ticketsData = [];
-                    const resumenPropinas = {};
-                    
-                    snapshot.forEach(doc => {
-                        const ticket = doc.data();
-                        ticketsData.push([
-                            ticket.fecha || 'Sin fecha',
-                            `$${ticket.monto?.toFixed(2) || '0.00'}`,
-                            ticket.empleados?.join(', ') || 'No especificados'
-                        ]);
-
-                        // Calcular propinas
-                        if (ticket.empleados && ticket.empleados.length > 0 && ticket.monto) {
-                            const propinaPorEmpleado = ticket.monto / ticket.empleados.length;
-                            ticket.empleados.forEach(empleado => {
-                                resumenPropinas[empleado] = (resumenPropinas[empleado] || 0) + propinaPorEmpleado;
-                            });
-                        }
-                    });
-
-                    // Tabla de tickets
-                    doc.setFontSize(12);
-                    doc.text('Detalle de Tickets', 14, 40);
-                    
-                    doc.autoTable({
-                        startY: 45,
-                        head: [['Fecha', 'Monto', 'Empleados']],
-                        body: ticketsData,
-                        theme: 'grid'
-                    });
-
-                    // Resumen de propinas
-                    const summaryY = doc.lastAutoTable.finalY + 20;
-                    doc.setFontSize(14);
-                    doc.text('Resumen de Propinas', 14, summaryY);
-                    
-                    const summaryTableData = Object.entries(resumenPropinas).map(([empleado, monto]) => [
-                        empleado,
-                        `$${monto.toFixed(2)}`
-                    ]);
-                    
-                    doc.autoTable({
-                        startY: summaryY + 5,
-                        head: [['Empleado', 'Propina']],
-                        body: summaryTableData,
-                        theme: 'grid'
-                    });
-
-                    // Guardar PDF
-                    doc.save(`Reporte_Propinas_Diario_${startDate}.pdf`);
-                    
-                    return;
-                }
-                else if (type === 'weekly') {
-                    const weekValue = document.getElementById('reportWeek').value;
-                    if (!weekValue) {
-                        alert('Por favor seleccione una semana');
-                        return;
-                    }
-                    
-                    // Parse year and week number correctly
-                    const [year, weekStr] = weekValue.split('-W');
-                    const week = parseInt(weekStr);
-                    
-                    // Create date for January 1st of the selected year
-                    const date = new Date(year, 0, 1);
-                    
-                    // Adjust to the first day of the week (Monday)
-                    while (date.getDay() !== 1) {
-                        date.setDate(date.getDate() + 1);
-                    }
-                    
-                    // Move to the selected week and subtract 1 week
-                    date.setDate(date.getDate() + (week - 2) * 7); // Restamos 2 para obtener la semana anterior
-                    startDate = date.toISOString().split('T')[0];
-                    
-                    // Calculate end date (6 days after start date)
-                    const endDateObj = new Date(date);
-                    endDateObj.setDate(date.getDate() + 6);
-                    endDate = endDateObj.toISOString().split('T')[0];
-
-                    // NEW: Title with week range
-                    const format = d => {
-                        const dateObj = new Date(d);
-                        return dateObj.toLocaleDateString('es-MX');
-                    };
-                    title = `Reporte Semanal: ${format(startDate)} - ${format(endDate)}`;
-                } 
-                else if (type === 'monthly') {
-                    const monthValue = document.getElementById('reportMonth').value;
-                    if (!monthValue) {
-                        alert('Por favor seleccione un mes');
-                        return;
-                    }
-                    const [year, month] = monthValue.split('-');
-                    startDate = new Date(year, month - 1, 1).toISOString().split('T')[0];
-                    endDate = new Date(year, month, 0).toISOString().split('T')[0];
-
-                    // NEW: Title with month and year in Spanish
-                    const monthName = new Date(year, month - 1).toLocaleString('es-MX', { month: 'long' });
-                    title = `Reporte Mensual: ${monthName.charAt(0).toUpperCase() + monthName.slice(1)} ${year}`;
-                }
-
-                modal.remove();
-
-                // Obtener tickets del período
-                const ticketsRef = db.collection('tickets');
-                const snapshot = await ticketsRef
-                    .where('fecha', '>=', startDate)
-                    .where('fecha', '<=', endDate)
-                    .get();
-
-                if (snapshot.empty) {
-                    alert(`No hay tickets para el período seleccionado (${startDate} - ${endDate})`);
-                    return;
-                }
-
-                // Usar la versión UMD de jsPDF
-                const { jsPDF } = window.jspdf;
-                const doc = new jsPDF();
-                
-                // NEW: Set the report title for weekly/monthly
-                doc.setFontSize(18);
-                doc.text(title, 14, 20);
-
-                // Agrupar tickets por día o semana según el tipo de reporte
-                // Cambiar de const a let para groupedData
-                let groupedData = {};
-                const resumenPropinas = {};
-                const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-                
-                snapshot.forEach(doc => {
-                    const ticket = doc.data();
-                    let groupKey;
-                    
-                    if (type === 'weekly') {
-                        // Agrupar por día para reporte semanal
-                        const fecha = new Date(ticket.fecha);
-                        const diaSemana = fecha.getDay(); // 0=Domingo, 1=Lunes, etc.
-                        groupKey = diasSemana[diaSemana];
-                    } else if (type === 'monthly') {
-                        // Agrupar por semana para reporte mensual
-                        const date = new Date(ticket.fecha);
-                        const firstDay = new Date(date.setDate(date.getDate() - date.getDay() + (date.getDay() === 0 ? -6 : 1)));
-                        groupKey = firstDay.toISOString().split('T')[0];
-                    }
-                    
-                    if (!groupedData[groupKey]) {
-                        groupedData[groupKey] = [];
-                    }
-                    groupedData[groupKey].push(ticket);
-
-                    // Calcular propinas
-                    if (ticket.empleados && ticket.empleados.length > 0 && ticket.monto) {
-                        const propinaPorEmpleado = ticket.monto / ticket.empleados.length;
-                        ticket.empleados.forEach(empleado => {
-                            resumenPropinas[empleado] = (resumenPropinas[empleado] || 0) + propinaPorEmpleado;
-                        });
-                    }
-                });
-
-                // Modificar la parte de ordenamiento para reporte semanal
-                if (type === 'weekly') {
-                    const orderedData = {};
-                    diasSemana.forEach(dia => {
-                        if (groupedData[dia]) {
-                            orderedData[dia] = groupedData[dia];
-                        }
-                    });
-                    groupedData = orderedData; // Esto ahora funciona porque groupedData es let
-                }
-
-                // Generar tablas por grupo
-                let currentY = 40;
-                
-                for (const [groupKey, tickets] of Object.entries(groupedData)) {
-                    // Título del grupo
-                    let groupTitle;
-                    if (type === 'weekly') {
-                        groupTitle = `Día: ${groupKey}`;
-                    } else if (type === 'monthly') {
-                        const date = new Date(groupKey);
-                        const endOfWeek = new Date(date);
-                        endOfWeek.setDate(date.getDate() + 6);
-                        groupTitle = `Semana del ${groupKey} al ${endOfWeek.toISOString().split('T')[0]}`;
-                    }
-                    
-                    doc.setFontSize(12);
-                    doc.text(groupTitle, 14, currentY);
-                    currentY += 10;
-                    
-                    // Tabla de tickets del grupo
-                    const ticketsTableData = tickets.map(ticket => [
-                        ticket.fecha || 'Sin fecha',
-                        `$${ticket.monto?.toFixed(2) || '0.00'}`,
-                        ticket.empleados?.join(', ') || 'No especificados'
-                    ]);
-                    
-                    doc.autoTable({
-                        startY: currentY,
-                        head: [['Fecha', 'Monto', 'Empleados']],
-                        body: ticketsTableData,
-                        theme: 'grid'
-                    });
-                    
-                    currentY = doc.lastAutoTable.finalY + 15;
-                }
-
-                // Resumen general de propinas
-                doc.setFontSize(14);
-                doc.text('Resumen General de Propinas', 14, currentY);
-                currentY += 10;
-                
-                const summaryTableData = Object.entries(resumenPropinas).map(([empleado, monto]) => [
-                    empleado,
-                    `$${monto.toFixed(2)}`
-                ]);
-                
-                doc.autoTable({
-                    startY: currentY,
-                    head: [['Empleado', 'Propina']],
-                    body: summaryTableData,
-                    theme: 'grid'
-                });
-                
-                // Guardar PDF
-                doc.save(`Reporte_Propinas_${type}_${new Date().toISOString().split('T')[0]}.pdf`);
-                
-                resolve();
-            });
-
-            document.getElementById('cancelReportBtn').addEventListener('click', () => {
-                modal.remove();
-                resolve();
-            });
-        });
-        
-    } catch (error) {
-        console.error('Error al generar reporte:', error);
-        alert('Error al generar el reporte: ' + error.message);
-    }
-}
-
 // Make sure the delete function is properly defined
 async function deleteTicket(e) {
     const ticketId = e.target.getAttribute('data-id');
@@ -971,3 +633,257 @@ function logout() {
 
 // Add logout button listener
 document.getElementById('logoutBtn').addEventListener('click', logout);
+
+
+// Helper to format date as YYYY-MM-DD in local time
+function formatLocalDate(date) {
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+// Helper to group tickets by period
+function groupTicketsByPeriod(tickets, period) {
+    const groups = {};
+    tickets.forEach(ticket => {
+        let key;
+        if (period === 'daily') {
+            key = ticket.fecha;
+        } else if (period === 'weekly') {
+            key = getWeekString(ticket.fecha);
+        } else if (period === 'monthly') {
+            const [year, month] = ticket.fecha.split('-');
+            key = `${year}-${month}`;
+        }
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(ticket);
+    });
+    return groups;
+}
+
+// Helper to filter tickets by selected period and value
+function filterTicketsByPeriod(tickets, period, value) {
+    if (period === 'daily') {
+        return tickets.filter(ticket => ticket.fecha === value);
+    } else if (period === 'weekly') {
+        return tickets.filter(ticket => getWeekString(ticket.fecha) === value);
+    } else if (period === 'monthly') {
+        return tickets.filter(ticket => {
+            const [year, month] = ticket.fecha.split('-');
+            return `${year}-${month}` === value;
+        });
+    }
+    return tickets;
+}
+
+// Function to prompt for date and generate PDF report
+async function generateReport(period) {
+    let inputType, inputLabel, value;
+    if (period === 'daily') {
+        inputType = 'date';
+        inputLabel = 'Selecciona el día para el reporte';
+    } else if (period === 'weekly') {
+        inputType = 'week';
+        inputLabel = 'Selecciona la semana para el reporte';
+    } else if (period === 'monthly') {
+        inputType = 'month';
+        inputLabel = 'Selecciona el mes para el reporte';
+    }
+
+    // Prompt user for date/week/month
+    const { value: selected } = await Swal.fire({
+        title: inputLabel,
+        input: inputType,
+        inputLabel: inputLabel,
+        inputPlaceholder: 'Selecciona...',
+        showCancelButton: true,
+        confirmButtonText: 'Generar',
+        cancelButtonText: 'Cancelar'
+    });
+
+    if (!selected) return; // Cancelled
+
+    // Format selected value for filtering
+    if (period === 'daily') {
+        value = selected; // YYYY-MM-DD
+    } else if (period === 'weekly') {
+        const [year, week] = selected.split('-W');
+        value = `${year}-W${week}`;
+    } else if (period === 'monthly') {
+        value = selected; // YYYY-MM
+    }
+
+    try {
+        const ticketsRef = db.collection('tickets');
+        const snapshot = await ticketsRef.orderBy('fecha', 'asc').get();
+        if (snapshot.empty) {
+            Swal.fire('No hay tickets para el reporte');
+            return;
+        }
+
+        // Collect all tickets
+        const tickets = [];
+        snapshot.forEach(doc => {
+            tickets.push(doc.data());
+        });
+
+        // Filter tickets by selected period
+        let filteredTickets;
+        if (period === 'monthly') {
+            filteredTickets = tickets.filter(ticket => {
+                const [year, month] = ticket.fecha.split('-');
+                return `${year}-${month}` === value;
+            });
+        } else {
+            filteredTickets = filterTicketsByPeriod(tickets, period, value);
+        }
+
+        if (filteredTickets.length === 0) {
+            Swal.fire('No hay tickets para el periodo seleccionado');
+            return;
+        }
+
+        // Prepare PDF
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+
+        // Header formatting
+        let title = '';
+        let subtitle = '';
+        if (period === 'daily') {
+            title = 'Reporte Diario de Propinas';
+            subtitle = `Fecha: ${formatDate(value)}`;
+        }
+        if (period === 'weekly') {
+            title = 'Reporte Semanal de Propinas';
+            subtitle = `Semana: ${getWeekRange(value)}`;
+        }
+        if (period === 'monthly') {
+            const [year, month] = value.split('-');
+            title = 'Reporte Mensual de Propinas';
+            subtitle = `Mes: ${month}/${year}`;
+        }
+
+        doc.setFontSize(20);
+        doc.text(title, 105, 18, { align: 'center' });
+        doc.setFontSize(13);
+        doc.text(subtitle, 105, 28, { align: 'center' });
+
+        let y = 38;
+
+        // Calculate grand total for filtered tickets
+        const grandTotal = filteredTickets.reduce((sum, t) => sum + (parseFloat(t.monto) || 0), 0);
+
+        // Show grand total at the top for daily/weekly/monthly
+        doc.setFontSize(14);
+        doc.setTextColor(0, 128, 0);
+        doc.text(`Total de propinas: $${grandTotal.toFixed(2)}`, 15, y);
+        doc.setTextColor(0, 0, 0);
+        y += 10;
+
+        // Table header formatting
+        function printTableHeader(doc, y) {
+            doc.setFontSize(11);
+            doc.setFont(undefined, 'bold');
+            doc.text('Fecha', 15, y);
+            doc.text('Monto', 45, y);
+            doc.text('Empleados', 75, y);
+            doc.text('Creado Por', 150, y);
+            doc.setFont(undefined, 'normal');
+            doc.line(15, y + 2, 195, y + 2); // underline
+            return y + 6;
+        }
+
+        // Table row formatting
+        function printTableRow(doc, ticket, y) {
+            const empleadosStr = ticket.empleados ? ticket.empleados.join(', ') : '';
+            doc.setFontSize(10);
+            doc.text(ticket.fecha, 15, y);
+            doc.text(`$${ticket.monto}`, 45, y);
+            doc.text(empleadosStr, 75, y, { maxWidth: 70 });
+            doc.text(ticket.creadoPor || '', 150, y);
+            return y + 6;
+        }
+
+        if (period === 'monthly') {
+            // Agrupar por semana dentro del mes seleccionado
+            const weeksInMonth = {};
+            filteredTickets.forEach(ticket => {
+                const weekStr = getWeekString(ticket.fecha);
+                if (!weeksInMonth[weekStr]) weeksInMonth[weekStr] = [];
+                weeksInMonth[weekStr].push(ticket);
+            });
+
+            Object.keys(weeksInMonth).sort().forEach(weekKey => {
+                // Calculate total for this week
+                const weekTotal = weeksInMonth[weekKey].reduce((sum, t) => sum + (parseFloat(t.monto) || 0), 0);
+
+                doc.setFontSize(13);
+                doc.setTextColor(40, 70, 200);
+                doc.text(getWeekRange(weekKey), 15, y);
+                doc.setTextColor(0, 128, 0);
+                doc.text(`Total semana: $${weekTotal.toFixed(2)}`, 120, y);
+                doc.setTextColor(0, 0, 0);
+                y += 7;
+
+                y = printTableHeader(doc, y);
+
+                weeksInMonth[weekKey].forEach(ticket => {
+                    y = printTableRow(doc, ticket, y);
+                    if (y > 270) {
+                        doc.addPage();
+                        y = 20;
+                    }
+                });
+
+                doc.line(15, y, 195, y); // separator line
+                y += 8;
+            });
+
+            // Show grand total at the end of the monthly report
+            doc.setFontSize(15);
+            doc.setTextColor(0, 128, 0);
+            doc.text(`Total mensual: $${grandTotal.toFixed(2)}`, 15, y);
+            doc.setTextColor(0, 0, 0);
+            y += 10;
+        } else {
+            // Agrupar por periodo (día o semana)
+            const grouped = groupTicketsByPeriod(filteredTickets, period);
+            Object.keys(grouped).forEach((groupKey, idx) => {
+                let groupTitle = '';
+                if (period === 'daily') groupTitle = formatDate(groupKey);
+                if (period === 'weekly') groupTitle = getWeekRange(groupKey);
+
+                // Calculate total for this group (day/week)
+                const groupTotal = grouped[groupKey].reduce((sum, t) => sum + (parseFloat(t.monto) || 0), 0);
+
+                doc.setFontSize(13);
+                doc.setTextColor(40, 70, 200);
+                doc.text(groupTitle, 15, y);
+                doc.setTextColor(0, 128, 0);
+                doc.text(`Total: $${groupTotal.toFixed(2)}`, 120, y);
+                doc.setTextColor(0, 0, 0);
+                y += 7;
+
+                y = printTableHeader(doc, y);
+
+                grouped[groupKey].forEach(ticket => {
+                    y = printTableRow(doc, ticket, y);
+                    if (y > 270) {
+                        doc.addPage();
+                        y = 20;
+                    }
+                });
+
+                doc.line(15, y, 195, y); // separator line
+                y += 8;
+            });
+        }
+
+        doc.save(`${title.replace(/ /g, '_')}.pdf`);
+    } catch (error) {
+        console.error('Error al generar el reporte:', error);
+        Swal.fire('Error al generar el reporte');
+    }
+}
