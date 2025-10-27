@@ -15,13 +15,23 @@ async function initApp() {
     }
 }
 
-// Helper to get ISO week string (YYYY-Www)
+// Helper to get ISO week string (YYYY-Www) with week starting on Sunday
 function getWeekString(dateStr) {
+    // Parse date as local time
     const date = new Date(dateStr);
-    date.setDate(date.getDate() + 4 - (date.getDay() || 7));
-    const yearStart = new Date(date.getFullYear(),0,1);
-    const weekNo = Math.ceil((((date - yearStart) / 86400000) + 1)/7);
-    return `${date.getFullYear()}-W${weekNo.toString().padStart(2, '0')}`;
+    // Get the day of week (Sunday = 0)
+    let day = date.getDay();
+    // Set date to Sunday of the current week
+    date.setDate(date.getDate() - day);
+    // Get year of the Sunday
+    const year = date.getFullYear();
+    // Calculate week number (weeks start on Sunday)
+    const yearStart = new Date(year, 0, 1);
+    const firstSunday = new Date(yearStart);
+    firstSunday.setDate(yearStart.getDate() - yearStart.getDay());
+    const diff = date - firstSunday;
+    const weekNo = Math.floor(diff / (7 * 86400000)) + 1;
+    return `${year}-W${weekNo.toString().padStart(2, '0')}`;
 }
 
 // Helper to get week range (start and end date) from ISO week string
@@ -667,7 +677,8 @@ function filterTicketsByPeriod(tickets, period, value) {
     if (period === 'daily') {
         return tickets.filter(ticket => ticket.fecha === value);
     } else if (period === 'weekly') {
-        return tickets.filter(ticket => getWeekString(ticket.fecha) === value);
+        // Filter by exact week string
+        filteredTickets = tickets.filter(ticket => getWeekString(ticket.fecha) === value);
     } else if (period === 'monthly') {
         return tickets.filter(ticket => {
             const [year, month] = ticket.fecha.split('-');
@@ -708,8 +719,8 @@ async function generateReport(period) {
     if (period === 'daily') {
         value = selected; // YYYY-MM-DD
     } else if (period === 'weekly') {
-        const [year, week] = selected.split('-W');
-        value = `${year}-W${week}`;
+        // Use the selected week string directly (YYYY-Www)
+        value = selected; // e.g., "2024-W21"
     } else if (period === 'monthly') {
         value = selected; // YYYY-MM
     }
@@ -735,6 +746,9 @@ async function generateReport(period) {
                 const [year, month] = ticket.fecha.split('-');
                 return `${year}-${month}` === value;
             });
+        } else if (period === 'weekly') {
+            // Filter by exact week string
+            filteredTickets = tickets.filter(ticket => getWeekString(ticket.fecha) === value);
         } else {
             filteredTickets = filterTicketsByPeriod(tickets, period, value);
         }
@@ -757,7 +771,7 @@ async function generateReport(period) {
         }
         if (period === 'weekly') {
             title = 'Reporte Semanal de Propinas';
-            subtitle = `Semana: ${getWeekRange(value)}`;
+            subtitle = `Semana: ${getWeekRange(value)}`; // Use the selected week string for range
         }
         if (period === 'monthly') {
             const [year, month] = value.split('-');
@@ -880,6 +894,53 @@ async function generateReport(period) {
                 y += 8;
             });
         }
+
+        // === EMPLOYEE SUMMARY TABLE ===
+        // Calculate total per employee for the filtered tickets
+        const employeeTotals = {};
+        filteredTickets.forEach(ticket => {
+            if (ticket.empleados && ticket.empleados.length > 0 && ticket.monto) {
+                const propinaPorEmpleado = ticket.monto / ticket.empleados.length;
+                ticket.empleados.forEach(empleado => {
+                    employeeTotals[empleado] = (employeeTotals[empleado] || 0) + propinaPorEmpleado;
+                });
+            }
+        });
+
+        // Move down before drawing the table
+        if (y > 250) {
+            doc.addPage();
+            y = 20;
+        } else {
+            y += 15;
+        }
+
+        doc.setFontSize(14);
+        doc.setTextColor(40, 70, 200);
+        doc.text('Resumen de Propinas por Empleado', 15, y);
+        doc.setTextColor(0, 0, 0);
+        y += 8;
+
+        // Table header
+        doc.setFontSize(11);
+        doc.setFont(undefined, 'bold');
+        doc.text('Empleado', 15, y);
+        doc.text('Total', 70, y);
+        doc.setFont(undefined, 'normal');
+        doc.line(15, y + 2, 100, y + 2);
+        y += 6;
+
+        // Table rows
+        Object.keys(employeeTotals).sort().forEach(empleado => {
+            doc.setFontSize(10);
+            doc.text(empleado, 15, y);
+            doc.text(`$${employeeTotals[empleado].toFixed(2)}`, 70, y);
+            y += 6;
+            if (y > 270) {
+                doc.addPage();
+                y = 20;
+            }
+        });
 
         doc.save(`${title.replace(/ /g, '_')}.pdf`);
     } catch (error) {
