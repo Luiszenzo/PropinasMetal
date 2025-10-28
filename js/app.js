@@ -948,3 +948,16 @@ async function generateReport(period) {
         Swal.fire('Error al generar el reporte');
     }
 }
+
+// Register service worker for PWA
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function() {
+        navigator.serviceWorker.register('/service-worker.js')
+            .then(function(registration) {
+                console.log('ServiceWorker registration successful:', registration);
+            })
+            .catch(function(error) {
+                console.log('ServiceWorker registration failed:', error);
+            });
+    });
+}
