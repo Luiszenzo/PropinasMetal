@@ -358,7 +358,8 @@ function resetEmpleadosButtons() {
 const HARDCODED_USERS = {
     'cami': '8989',
     'sofi': 'Juanito123',
-    'toño': '12345'
+    'toño': '12345',
+    'Lily': 'Metal'
 };
 
 let currentUser = null;
