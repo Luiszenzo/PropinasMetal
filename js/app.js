@@ -68,7 +68,6 @@ async function displayTickets() {
 
         // Change resumenPropinas to be grouped by week and employee
         const resumenPropinas = {}; // { week: { empleado: monto } }
-        const resumenPropinasMensual = {}; // { month: { empleado: monto } }
         let currentDate = null;
         let dateGroupElement = null;
         
@@ -123,86 +122,32 @@ async function displayTickets() {
                 </div>
             `;
             
-            // Add ticket to the current date's tickets group
+            // Add ticket to the current date's tickets group (CHANGED THIS LINE)
             dateGroupElement.querySelector('.tickets-group').appendChild(ticketElement);
             
             // Add event listener for the delete button
             const deleteBtn = ticketElement.querySelector('.btn-delete');
             deleteBtn.addEventListener('click', deleteTicket);
             
-            // Calcular propinas por empleado agrupadas por semana y mes
+            // Calcular propinas por empleado agrupadas por semana
             if (ticket.empleados && ticket.empleados.length > 0 && ticket.monto) {
                 const propinaPorEmpleado = ticket.monto / ticket.empleados.length;
                 const weekStr = getWeekString(ticketDate);
-                const monthStr = ticketDate.slice(0,7); // YYYY-MM
-                
                 if (!resumenPropinas[weekStr]) resumenPropinas[weekStr] = {};
-                if (!resumenPropinasMensual[monthStr]) resumenPropinasMensual[monthStr] = {};
-                
                 ticket.empleados.forEach(empleado => {
                     resumenPropinas[weekStr][empleado] = (resumenPropinas[weekStr][empleado] || 0) + propinaPorEmpleado;
-                    resumenPropinasMensual[monthStr][empleado] = (resumenPropinasMensual[monthStr][empleado] || 0) + propinaPorEmpleado;
                 });
             }
         });
 
         // Mostrar resumen de propinas por semana
         mostrarResumenPropinas(resumenPropinas);
-        // Mostrar resumen de propinas por mes
-        mostrarResumenPropinasMensual(resumenPropinasMensual);
         
     } catch (error) {
         console.error('Error al obtener tickets:', error);
         const ticketsList = document.querySelector('.tickets-list');
         ticketsList.innerHTML = '<p class="error">Error al cargar tickets</p>';
     }
-}
-
-// Nueva función para mostrar resumen mensual similar a mostrarResumenPropinas
-function mostrarResumenPropinasMensual(resumen) {
-    const appElement = document.getElementById('app');
-    let resumenMensualContainer = document.querySelector('.resumen-mensual-container');
-    if (!resumenMensualContainer) {
-        resumenMensualContainer = document.createElement('div');
-        resumenMensualContainer.className = 'resumen-mensual-container';
-        appElement.appendChild(resumenMensualContainer);
-    }
-
-    // Get all unique employees and months
-    const months = Object.keys(resumen).sort();
-    const empleadosSet = new Set();
-    months.forEach(month => {
-        Object.keys(resumen[month]).forEach(emp => empleadosSet.add(emp));
-    });
-    const empleados = Array.from(empleadosSet).sort();
-
-    // Build table header with month labels
-    let thead = `<tr><th>Empleado</th>`;
-    months.forEach(month => {
-        // Format month as "MM/YYYY"
-        const [year, mon] = month.split('-');
-        thead += `<th>${mon}/${year}</th>`;
-    });
-    thead += `</tr>`;
-
-    // Build table body
-    let tbody = '';
-    empleados.forEach(emp => {
-        tbody += `<tr><td>${emp}</td>`;
-        months.forEach(month => {
-            const monto = resumen[month][emp] || 0;
-            tbody += `<td>$${monto.toFixed(2)}</td>`;
-        });
-        tbody += `</tr>`;
-    });
-
-    resumenMensualContainer.innerHTML = `
-        <h3 class="resumen-title">Resumen de Propinas por Mes</h3>
-        <table class="resumen-table">
-            <thead>${thead}</thead>
-            <tbody>${tbody}</tbody>
-        </table>
-    `;
 }
 
 // Add this helper function
