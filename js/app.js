@@ -207,10 +207,19 @@ function mostrarResumenPropinas(resumen) {
 
     resumenContainer.innerHTML = `
         <h3 class="resumen-title">Resumen de Propinas por Semana</h3>
-        <table class="resumen-table">
-            <thead>${thead}</thead>
-            <tbody>${tbody}</tbody>
-        </table>
+        <div class="resumen-scroll-container">
+            <table class="resumen-table">
+                <thead>${thead}</thead>
+                <tbody>${tbody}</tbody>
+            </table>
+        </div>
+        <style>
+            .resumen-scroll-container {
+            max-height: 300px; /* Adjust height as needed */
+            overflow-y: auto;
+            border: 1px solid #ccc; /* Optional: border for clarity */
+        }
+        </style>
     `;
 }
 
