@@ -194,10 +194,11 @@ function mostrarResumenPropinas(resumen) {
     });
     thead += `</tr>`;
 
-    // Build table body
+    // Build table body with alternating row colors
     let tbody = '';
-    empleados.forEach(emp => {
-        tbody += `<tr><td>${emp}</td>`;
+    empleados.forEach((emp, index) => {
+        const rowClass = index % 2 === 0 ? 'even-row' : 'odd-row';
+        tbody += `<tr class="${rowClass}"><td>${emp}</td>`;
         weeks.forEach(week => {
             const monto = resumen[week][emp] || 0;
             tbody += `<td>$${monto.toFixed(2)}</td>`;
@@ -206,20 +207,42 @@ function mostrarResumenPropinas(resumen) {
     });
 
     resumenContainer.innerHTML = `
-        <h3 class="resumen-title">Resumen de Propinas por Semana</h3>
-        <div class="resumen-scroll-container">
-            <table class="resumen-table">
-                <thead>${thead}</thead>
-                <tbody>${tbody}</tbody>
-            </table>
-        </div>
         <style>
-            .resumen-scroll-container {
-            max-height: 300px; /* Adjust height as needed */
-            overflow-y: auto;
-            border: 1px solid #ccc; /* Optional: border for clarity */
-        }
+            .resumen-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 10px;
+            }
+            .resumen-table th, .resumen-table td {
+                border: 1px solid #ccc;
+                padding: 8px;
+                text-align: center;
+            }
+            .resumen-table th {
+                background-color: #007BFF;
+                color: white;
+                position: sticky;
+                top: 0;
+                z-index: 1;
+            }
+            .resumen-table tr.even-row {
+                background-color: #f9f9f9;
+            }
+            .resumen-table tr.odd-row {
+                background-color: #ffffff;
+            }
+            .resumen-title {
+                margin-bottom: 5px;
+            }
+            .resumen-container {
+                overflow-x: auto;
+            }
         </style>
+        <h3 class="resumen-title">Resumen de Propinas por Semana</h3>
+        <table class="resumen-table">
+            <thead>${thead}</thead>
+            <tbody>${tbody}</tbody>
+        </table>
     `;
 }
 
