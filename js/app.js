@@ -68,7 +68,7 @@ async function displayTickets() {
 
         // Change resumenPropinas to be grouped by week and employee
         const resumenPropinas = {}; // { week: { empleado: monto } }
-        const resumenPropinasMes = {}; // { month: { empleado: monto } }  <-- NEW
+        const resumenPropinasMensual = {}; // { month: { empleado: monto } }
         let currentDate = null;
         let dateGroupElement = null;
         
@@ -123,7 +123,7 @@ async function displayTickets() {
                 </div>
             `;
             
-            // Add ticket to the current date's tickets group (CHANGED THIS LINE)
+            // Add ticket to the current date's tickets group
             dateGroupElement.querySelector('.tickets-group').appendChild(ticketElement);
             
             // Add event listener for the delete button
@@ -134,30 +134,23 @@ async function displayTickets() {
             if (ticket.empleados && ticket.empleados.length > 0 && ticket.monto) {
                 const propinaPorEmpleado = ticket.monto / ticket.empleados.length;
                 const weekStr = getWeekString(ticketDate);
-                const [year, month] = ticketDate.split('-');
-                const monthStr = `${year}-${month}`;
+                const monthStr = ticketDate.slice(0,7); // YYYY-MM
                 
-                // Group by week
                 if (!resumenPropinas[weekStr]) resumenPropinas[weekStr] = {};
+                if (!resumenPropinasMensual[monthStr]) resumenPropinasMensual[monthStr] = {};
+                
                 ticket.empleados.forEach(empleado => {
                     resumenPropinas[weekStr][empleado] = (resumenPropinas[weekStr][empleado] || 0) + propinaPorEmpleado;
-                });
-
-                // Group by month  <-- NEW
-                if (!resumenPropinasMes[monthStr]) resumenPropinasMes[monthStr] = {};
-                ticket.empleados.forEach(empleado => {
-                    resumenPropinasMes[monthStr][empleado] = (resumenPropinasMes[monthStr][empleado] || 0) + propinaPorEmpleado;
+                    resumenPropinasMensual[monthStr][empleado] = (resumenPropinasMensual[monthStr][empleado] || 0) + propinaPorEmpleado;
                 });
             }
         });
 
         // Mostrar resumen de propinas por semana
         mostrarResumenPropinas(resumenPropinas);
-
-        // Optionally, show monthly summary as well (you can create a separate container or toggle)
-        // For example, append monthly summary below weekly summary:
-        mostrarResumenPropinasMes(resumenPropinasMes);  // <-- NEW
-
+        // Mostrar resumen de propinas por mes
+        mostrarResumenPropinasMensual(resumenPropinasMensual);
+        
     } catch (error) {
         console.error('Error al obtener tickets:', error);
         const ticketsList = document.querySelector('.tickets-list');
@@ -165,31 +158,30 @@ async function displayTickets() {
     }
 }
 
-// New function to show monthly summary similar to weekly summary
-function mostrarResumenPropinasMes(resumenMes) {
+// Nueva función para mostrar resumen mensual similar a mostrarResumenPropinas
+function mostrarResumenPropinasMensual(resumen) {
     const appElement = document.getElementById('app');
-    let resumenContainerMes = document.querySelector('.resumen-container-mes');
-    if (!resumenContainerMes) {
-        resumenContainerMes = document.createElement('div');
-        resumenContainerMes.className = 'resumen-container-mes';
-        appElement.appendChild(resumenContainerMes);
+    let resumenMensualContainer = document.querySelector('.resumen-mensual-container');
+    if (!resumenMensualContainer) {
+        resumenMensualContainer = document.createElement('div');
+        resumenMensualContainer.className = 'resumen-mensual-container';
+        appElement.appendChild(resumenMensualContainer);
     }
 
     // Get all unique employees and months
-    const months = Object.keys(resumenMes).sort();
+    const months = Object.keys(resumen).sort();
     const empleadosSet = new Set();
     months.forEach(month => {
-        Object.keys(resumenMes[month]).forEach(emp => empleadosSet.add(emp));
+        Object.keys(resumen[month]).forEach(emp => empleadosSet.add(emp));
     });
     const empleados = Array.from(empleadosSet).sort();
 
     // Build table header with month labels
     let thead = `<tr><th>Empleado</th>`;
     months.forEach(month => {
-        // Format month as "MM/YYYY" or localized string
+        // Format month as "MM/YYYY"
         const [year, mon] = month.split('-');
-        const monthName = new Date(year, mon - 1).toLocaleString('es-ES', { month: 'long', year: 'numeric' });
-        thead += `<th>${monthName.charAt(0).toUpperCase() + monthName.slice(1)}</th>`;
+        thead += `<th>${mon}/${year}</th>`;
     });
     thead += `</tr>`;
 
@@ -198,19 +190,38 @@ function mostrarResumenPropinasMes(resumenMes) {
     empleados.forEach(emp => {
         tbody += `<tr><td>${emp}</td>`;
         months.forEach(month => {
-            const monto = resumenMes[month][emp] || 0;
+            const monto = resumen[month][emp] || 0;
             tbody += `<td>$${monto.toFixed(2)}</td>`;
         });
         tbody += `</tr>`;
     });
 
-    resumenContainerMes.innerHTML = `
+    resumenMensualContainer.innerHTML = `
         <h3 class="resumen-title">Resumen de Propinas por Mes</h3>
         <table class="resumen-table">
             <thead>${thead}</thead>
             <tbody>${tbody}</tbody>
         </table>
     `;
+}
+
+// Add this helper function
+// Update this helper function to handle timezone correctly
+function formatDate(dateString) {
+    // Parse the date string in local timezone
+    const [year, month, day] = dateString.split('-');
+    const date = new Date(year, month - 1, day);
+    
+    const options = { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+    };
+    
+    // Format to Spanish and capitalize first letter
+    let formattedDate = date.toLocaleDateString('es-ES', options);
+    return formattedDate.charAt(0).toUpperCase() + formattedDate.slice(1);
 }
 
 // Función para mostrar el resumen de propinas
