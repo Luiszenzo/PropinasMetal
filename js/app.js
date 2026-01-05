@@ -53,20 +53,24 @@ function getWeekString(dateStr) {
 // Helper to get week range (start and end date) from ISO week string
 function getWeekRange(isoWeekStr) {
     const [year, week] = isoWeekStr.split('-W');
-    const simple = new Date(year, 0, 1 + (parseInt(week) - 1) * 7);
-    // ISO week starts on Monday
-    const dayOfWeek = simple.getDay();
-    const monday = new Date(simple);
-    if (dayOfWeek <= 4) {
-        monday.setDate(simple.getDate() - simple.getDay() + 1);
-    } else {
-        monday.setDate(simple.getDate() + 8 - simple.getDay());
-    }
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
+    const weekNum = parseInt(week, 10);
+
+    // Find the first Sunday of the year
+    const firstDayOfYear = new Date(year, 0, 1);
+    const firstSunday = new Date(firstDayOfYear);
+    firstSunday.setDate(firstDayOfYear.getDate() + (7 - firstDayOfYear.getDay()) % 7);
+
+    // Calculate the Sunday of the requested week
+    const sunday = new Date(firstSunday);
+    sunday.setDate(firstSunday.getDate() + (weekNum - 1) * 7);
+
+    // Saturday is 6 days after Sunday
+    const saturday = new Date(sunday);
+    saturday.setDate(sunday.getDate() + 6);
+
     // Format as DD/MM/YYYY
     const format = d => d.toLocaleDateString('es-MX');
-    return `${format(monday)} - ${format(sunday)}`;
+    return `${format(sunday)} - ${format(saturday)}`;
 }
 
 // Función para mostrar tickets
