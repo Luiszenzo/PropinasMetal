@@ -17,20 +17,36 @@ async function initApp() {
 
 // Helper to get ISO week string (YYYY-Www) with week starting on Sunday
 function getWeekString(dateStr) {
-    // Parse date as local time
     const date = new Date(dateStr);
     // Get the day of week (Sunday = 0)
-    let day = date.getDay();
+    const day = date.getDay();
     // Set date to Sunday of the current week
-    date.setDate(date.getDate() - day);
-    // Get year of the Sunday
-    const year = date.getFullYear();
-    // Calculate week number (weeks start on Sunday)
+    const sunday = new Date(date);
+    sunday.setDate(date.getDate() - day);
+
+    // Determine the year for the week based on the Sunday date
+    let year = sunday.getFullYear();
+
+    // Calculate the first Sunday of the year
     const yearStart = new Date(year, 0, 1);
     const firstSunday = new Date(yearStart);
     firstSunday.setDate(yearStart.getDate() - yearStart.getDay());
-    const diff = date - firstSunday;
+
+    // Calculate week number
+    const diff = sunday - firstSunday;
     const weekNo = Math.floor(diff / (7 * 86400000)) + 1;
+
+    // Handle edge case: if weekNo is 0, it belongs to the last week of previous year
+    if (weekNo === 0) {
+        year -= 1;
+        const prevYearStart = new Date(year, 0, 1);
+        const prevFirstSunday = new Date(prevYearStart);
+        prevFirstSunday.setDate(prevYearStart.getDate() - prevYearStart.getDay());
+        const diffPrev = sunday - prevFirstSunday;
+        const prevWeekNo = Math.floor(diffPrev / (7 * 86400000)) + 1;
+        return `${year}-W${prevWeekNo.toString().padStart(2, '0')}`;
+    }
+
     return `${year}-W${weekNo.toString().padStart(2, '0')}`;
 }
 
