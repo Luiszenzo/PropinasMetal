@@ -15,6 +15,45 @@ async function initApp() {
     }
 }
 
+// Helper to get ISO week string (YYYY-Www) with week starting on Monday
+function getWeekString(dateStr) {
+    const date = new Date(dateStr);
+    // Copy date so don't modify original
+    const target = new Date(date.valueOf());
+    // Set to nearest Thursday: current date + 4 - current day number (Monday=1, Sunday=7)
+    const dayNr = (date.getDay() + 6) % 7; // Monday=0,...Sunday=6
+    target.setDate(target.getDate() - dayNr + 3);
+    // January 4th is always in week 1
+    const firstThursday = new Date(target.getFullYear(), 0, 4);
+    const firstDayNr = (firstThursday.getDay() + 6) % 7;
+    firstThursday.setDate(firstThursday.getDate() - firstDayNr + 3);
+    // Calculate full weeks to target date
+    const weekNo = 1 + Math.round(((target - firstThursday) / 86400000 - 3) / 7);
+    const year = target.getFullYear();
+    return `${year}-W${weekNo.toString().padStart(2, '0')}`;
+}
+
+// Helper to get week range (start and end date) from ISO week string (Monday to Sunday)
+function getWeekRange(isoWeekStr) {
+    const [yearStr, weekStr] = isoWeekStr.split('-W');
+    const year = parseInt(yearStr, 10);
+    const week = parseInt(weekStr, 10);
+
+    // Find Monday of the week
+    const simple = new Date(year, 0, 1 + (week - 1) * 7);
+    const day = simple.getDay();
+    const ISOweekStart = new Date(simple);
+    // Adjust to Monday (day 1)
+    const diff = (day <= 0 ? 7 : day) - 1; // Sunday=0 -> 7
+    ISOweekStart.setDate(simple.getDate() - diff);
+
+    const ISOweekEnd = new Date(ISOweekStart);
+    ISOweekEnd.setDate(ISOweekStart.getDate() + 6);
+
+    const format = d => d.toLocaleDateString('es-MX');
+    return `${format(ISOweekStart)} - ${format(ISOweekEnd)}`;
+}
+
 // Helper to get ISO week string (YYYY-Www) with week starting on Sunday
 function getWeekString(dateStr) {
     const date = new Date(dateStr);
