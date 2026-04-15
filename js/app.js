@@ -303,7 +303,7 @@ async function createTicket() {
 
 // Modifica initApp para agregar el botón
 // Lista de empleados disponibles (puedes obtenerla de Firestore si prefieres)
-const empleados = ['Juan', 'Kike', 'Sofi', 'Toño', 'Daniel', "Cami", "Rodrigo", "Cesar", "Ivet", "Lulu", "Carlo", "Mich", "Pao"];
+const empleados = ['Juan', 'Kike', 'Sofi', 'Toño', 'Daniel', "Cami", "Cesar", "Ivet", "Lulu", "Carlo", "Mich", "Pao"];
 
 // Referencias a elementos del DOM
 let modal;
